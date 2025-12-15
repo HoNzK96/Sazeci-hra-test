@@ -16,7 +16,7 @@ body{
 }
 .app{
   width:100%;
-  max-width:460px;
+  max-width:480px;
   background:#4b2e14;
   color:white;
   padding:20px;
@@ -37,14 +37,14 @@ button:hover{background:#a56c33;}
 .hidden{display:none;}
 h1,h2,h3{text-align:center;}
 hr{margin:15px 0;}
-small{opacity:0.8;}
+small{opacity:0.85; display:block;}
 </style>
 </head>
 
 <body>
 <div class="app">
 
-<h1>🎲 Herní platforma t2</h1>
+<h1>>🎲 Herní platforma t3</h1>
 
 <!-- LOGIN -->
 <div id="login-screen">
@@ -109,6 +109,17 @@ async function saveDB(){
   });
 }
 
+/* ================= HELPERS ================= */
+function toCopper(g,s,c){
+  return g*100 + s*10 + c;
+}
+function fromCopper(v){
+  let g = Math.floor(v/100);
+  let s = Math.floor((v%100)/10);
+  let c = v%10;
+  return `Z${g} / S${s} / M${c}`;
+}
+
 /* ================= LOGIN ================= */
 async function doLogin(){
   nickname = document.getElementById("nick").value.trim();
@@ -138,9 +149,9 @@ function renderSazky(){
   if(isAdmin){
     html += `
       <h3>Admin – vytvoření sázky</h3>
-      <input id="betName" placeholder="Název sázky (např. Franta pije ?)">
+      <input id="betName" placeholder="Název sázky (Franta pije ?)">
       <input id="betOdds" type="number" step="0.1" min="1" placeholder="Kurz">
-      <button onclick="createBet()">Vytvořit sázku & hodit</button>
+      <button onclick="createBet()">Vytvořit sázku & hodit 🎲</button>
       <hr>
     `;
   }
@@ -156,7 +167,7 @@ function renderSazky(){
       <p>
         <strong>${name}</strong><br>
         Kurz: ${r.odds}<br>
-        ${isAdmin ? `🎲 Výsledek: <strong>${r.result}</strong>` : ""}
+        ${isAdmin ? `<strong>🎲 Výsledek: ${r.result}</strong>` : ""}
       </p>
     `;
 
@@ -165,9 +176,33 @@ function renderSazky(){
         <select id="guess-${name}">
           ${[1,2,3,4,5,6].map(n=>`<option value="${n}">${n}</option>`).join("")}
         </select>
-        <input id="bet-${name}" type="number" min="1" placeholder="Výše sázky">
+
+        <input id="gold-${name}" type="number" min="0" placeholder="Zlaté">
+        <input id="silver-${name}" type="number" min="0" placeholder="Stříbrné">
+        <input id="copper-${name}" type="number" min="0" placeholder="Měděné">
+
         <button onclick="placeBet('${name}')">Vsadit</button>
       `;
+    }
+
+    if(isAdmin){
+      html += r.bets.map(b=>{
+        const betC = toCopper(b.bet.g,b.bet.s,b.bet.c);
+        let result;
+        if(b.guess === r.result){
+          result = "🎉 Výhra " + fromCopper(Math.floor(betC * r.odds));
+        } else {
+          result = "❌ Prohra " + fromCopper(betC);
+        }
+        return `
+          <small>
+            👤 ${b.player} |
+            vsadil ${fromCopper(betC)} |
+            tip ${b.guess} →
+            ${result}
+          </small>
+        `;
+      }).join("");
     }
 
     html += `<hr>`;
@@ -193,14 +228,17 @@ function createBet(){
 
 function placeBet(name){
   const guess = parseInt(document.getElementById(`guess-${name}`).value);
-  const amount = parseInt(document.getElementById(`bet-${name}`).value);
 
-  if(!amount || amount <= 0) return alert("Zadej platnou sázku");
+  const g = +document.getElementById(`gold-${name}`).value || 0;
+  const s = +document.getElementById(`silver-${name}`).value || 0;
+  const c = +document.getElementById(`copper-${name}`).value || 0;
+
+  if(g+s+c <= 0) return alert("Musíš vsadit aspoň něco");
 
   db.games.sazky.rounds[name].bets.push({
     player: nickname,
     guess,
-    amount,
+    bet:{ g,s,c },
     time: Date.now()
   });
 
@@ -220,7 +258,7 @@ function renderPlaceholder(game){
 
   document.getElementById("gameArea").innerHTML = `
     <h2>${titles[game]}</h2>
-    <p><em>Hra je připravena – logika bude doplněna.</em></p>
+    <p><em>Hra je připravena – logika se doplní.</em></p>
   `;
 }
 </script>

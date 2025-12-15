@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Herní platforma</title>
+
+<style>
+body{
+  margin:0;
+  padding:20px;
+  background:#eee;
+  font-family:Arial;
+  display:flex;
+  justify-content:center;
+}
+.app{
+  width:100%;
+  max-width:460px;
+  background:#4b2e14;
+  color:white;
+  padding:20px;
+  border-radius:12px;
+}
+input,select,button{
+  width:100%;
+  padding:10px;
+  margin:6px 0;
+}
+button{
+  background:#8a5a2c;
+  border:none;
+  color:white;
+  cursor:pointer;
+}
+button:hover{background:#a56c33;}
+.hidden{display:none;}
+h1,h2,h3{text-align:center;}
+hr{margin:15px 0;}
+</style>
+</head>
+
+<body>
+<div class="app">
+
+<h1>🎲 Herní platforma</h1>
+
+<!-- LOGIN -->
+<div id="login">
+  <input id="nick" placeholder="Přezdívka">
+  <button onclick="login()">Vstoupit</button>
+</div>
+
+<!-- GAME SELECT -->
+<div id="gameSelect" class="hidden">
+  <h2>Výběr hry</h2>
+  <select id="gameType" onchange="renderGame()">
+    <option value="sazky">🎯 Sázky</option>
+    <option value="jednicky_petky">🎲 Jedničky a pětky</option>
+    <option value="maroko">🎲 Maroko</option>
+    <option value="oko">👁️ Oko (21)</option>
+    <option value="general">⭐ Generál</option>
+    <option value="ruleta">🎡 Ruleta</option>
+  </select>
+</div>
+
+<!-- GAME AREA -->
+<div id="gameArea"></div>
+
+</div>
+
+<script>
+/* ===== JSONBIN ===== */
+const BIN_ID = "TVŮJ_BIN_ID";
+const BIN_KEY = "TVŮJ_MASTER_KEY";
+const BIN_URL = `https://api.jsonbin.io/v3/b/${BIN_ID}`;
+
+let nickname = "";
+let isAdmin = false;
+let db = {
+  games:{
+    sazky:{ rounds:{} },
+    jednicky_petky:{},
+    maroko:{},
+    oko:{},
+    general:{},
+    ruleta:{}
+  }
+};
+
+async function loadDB(){
+  const r = await fetch(BIN_URL+"/latest",{headers:{"X-Master-Key":BIN_KEY}});
+  const j = await r.json();
+  if(j.record) db = j.record;
+}
+async function saveDB(){
+  await fetch(BIN_URL,{
+    method:"PUT",
+    headers:{
+      "Content-Type":"application/json",
+      "X-Master-Key":BIN_KEY
+    },
+    body:JSON.stringify(db)
+  });
+}
+
+/* ===== LOGIN ===== */
+async function login(){
+  nickname = nick.value.trim();
+  if(!nickname) return alert("Zadej přezdívku");
+  isAdmin = nickname.toLowerCase()==="adminif";
+  await loadDB();
+  login.classList.add("hidden");
+  gameSelect.classList.remove("hidden");
+  renderGame();
+}
+
+/* ===== RENDER ===== */
+function renderGame(){
+  const g = gameType.value;
+  if(g==="sazky") renderSazky();
+  else renderPlaceholder(g);
+}
+
+/* ===== SÁZKY ===== */
+function renderSazky(){
+  let html = `<h2>🎯 Sázky</h2>`;
+
+  if(isAdmin){
+    html += `
+    <h3>Admin – nová sázka</h3>
+    <input id="betName" placeholder="Název sázky">
+    <input id="betOdds" type="number" step="0.1" placeholder="Kurz">
+    <button onclick="createBet()">Vytvořit & hodit</button>
+    <hr>`;
+  }
+
+  html += `<h3>Aktivní sázky</h3>`;
+  for(let name in db.games.sazky.rounds){
+    const r = db.games.sazky.rounds[name];
+    html += `
+      <p><strong>${name}</strong><br>
+      Kurz: ${r.odds}<br>
+      ${isAdmin?`Výsledek: ${r.result}`:""}
+      </p>`;
+    if(!isAdmin){
+      html += `
+      <select id="guess-${name}">
+        ${[1,2,3,4,5,6].map(n=>`<option>${n}</option>`).join("")}
+      </select>
+      <input id="bet-${name}" type="number" placeholder="Sázka">
+      <button onclick="placeBet('${name}')">Vsadit</button>`;
+    }
+    html += `<hr>`;
+  }
+
+  gameArea.innerHTML = html;
+}
+
+function createBet(){
+  const name = betName.value.trim();
+  const odds = parseFloat(betOdds.value);
+  if(!name || odds<1) return alert("Neplatná data");
+  db.games.sazky.rounds[name]={
+    odds,
+    result: Math.floor(Math.random()*6)+1,
+    bets:[]
+  };
+  saveDB(); renderSazky();
+}
+
+function placeBet(name){
+  const g = parseInt(document.getElementById(`guess-${name}`).value);
+  const a = parseInt(document.getElementById(`bet-${name}`).value);
+  if(a<=0) return alert("Neplatná sázka");
+  db.games.sazky.rounds[name].bets.push({
+    player:nickname,
+    guess:g,
+    amount:a
+  });
+  saveDB(); alert("Vsazeno");
+}
+
+/* ===== PLACEHOLDERS ===== */
+function renderPlaceholder(name){
+  const titles={
+    jednicky_petky:"Jedničky a pětky",
+    maroko:"Maroko",
+    oko:"Oko (21)",
+    general:"Generál",
+    ruleta:"Ruleta"
+  };
+  gameArea.innerHTML=`
+    <h2>${titles[name]}</h2>
+    <p><em>Hra připravena – logika bude doplněna.</em></p>`;
+}
+</script>
+</body>
+</html>

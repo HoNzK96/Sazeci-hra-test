@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Herní platforma test1</title>
+<title>Herní platforma</title>
 
 <style>
 body{
@@ -37,18 +37,19 @@ button:hover{background:#a56c33;}
 .hidden{display:none;}
 h1,h2,h3{text-align:center;}
 hr{margin:15px 0;}
+small{opacity:0.8;}
 </style>
 </head>
 
 <body>
 <div class="app">
 
-<h1>🎲 Herní platforma test1</h1>
+<h1>🎲 Herní platforma</h1>
 
 <!-- LOGIN -->
-<div id="login">
+<div id="login-screen">
   <input id="nick" placeholder="Přezdívka">
-  <button onclick="login()">Vstoupit</button>
+  <button onclick="doLogin()">Vstoupit</button>
 </div>
 
 <!-- GAME SELECT -->
@@ -70,13 +71,14 @@ hr{margin:15px 0;}
 </div>
 
 <script>
-/* ===== JSONBIN ===== */
+/* ================= JSONBIN ================= */
 const BIN_ID = "69406399ae596e708f9c3bbf";
 const BIN_KEY = "$2a$10$goc9hv95v4RRqBaqspuG8e/BhhBaoy9tVQoHlPD3WPtYtlXzV.xhS";
 const BIN_URL = `https://api.jsonbin.io/v3/b/${BIN_ID}`;
 
 let nickname = "";
 let isAdmin = false;
+
 let db = {
   games:{
     sazky:{ rounds:{} },
@@ -89,110 +91,137 @@ let db = {
 };
 
 async function loadDB(){
-  const r = await fetch(BIN_URL+"/latest",{headers:{"X-Master-Key":BIN_KEY}});
+  const r = await fetch(BIN_URL+"/latest",{
+    headers:{ "X-Master-Key": BIN_KEY }
+  });
   const j = await r.json();
   if(j.record) db = j.record;
 }
+
 async function saveDB(){
   await fetch(BIN_URL,{
     method:"PUT",
     headers:{
       "Content-Type":"application/json",
-      "X-Master-Key":BIN_KEY
+      "X-Master-Key": BIN_KEY
     },
-    body:JSON.stringify(db)
+    body: JSON.stringify(db)
   });
 }
 
-/* ===== LOGIN ===== */
-async function login(){
-  nickname = nick.value.trim();
+/* ================= LOGIN ================= */
+async function doLogin(){
+  nickname = document.getElementById("nick").value.trim();
   if(!nickname) return alert("Zadej přezdívku");
-  isAdmin = nickname.toLowerCase()==="adminif";
+
+  isAdmin = nickname.toLowerCase() === "adminif";
+
   await loadDB();
-  login.classList.add("hidden");
-  gameSelect.classList.remove("hidden");
+
+  document.getElementById("login-screen").classList.add("hidden");
+  document.getElementById("gameSelect").classList.remove("hidden");
+
   renderGame();
 }
 
-/* ===== RENDER ===== */
+/* ================= RENDER ================= */
 function renderGame(){
-  const g = gameType.value;
-  if(g==="sazky") renderSazky();
+  const g = document.getElementById("gameType").value;
+  if(g === "sazky") renderSazky();
   else renderPlaceholder(g);
 }
 
-/* ===== SÁZKY ===== */
+/* ================= SÁZKY ================= */
 function renderSazky(){
   let html = `<h2>🎯 Sázky</h2>`;
 
   if(isAdmin){
     html += `
-    <h3>Admin – nová sázka</h3>
-    <input id="betName" placeholder="Název sázky">
-    <input id="betOdds" type="number" step="0.1" placeholder="Kurz">
-    <button onclick="createBet()">Vytvořit & hodit</button>
-    <hr>`;
+      <h3>Admin – vytvoření sázky</h3>
+      <input id="betName" placeholder="Název sázky (např. Franta pije ?)">
+      <input id="betOdds" type="number" step="0.1" min="1" placeholder="Kurz">
+      <button onclick="createBet()">Vytvořit sázku & hodit</button>
+      <hr>
+    `;
   }
 
-  html += `<h3>Aktivní sázky</h3>`;
-  for(let name in db.games.sazky.rounds){
-    const r = db.games.sazky.rounds[name];
+  const rounds = db.games.sazky.rounds;
+  if(!Object.keys(rounds).length){
+    html += `<p><em>Žádné aktivní sázky</em></p>`;
+  }
+
+  for(let name in rounds){
+    const r = rounds[name];
     html += `
-      <p><strong>${name}</strong><br>
-      Kurz: ${r.odds}<br>
-      ${isAdmin?`Výsledek: ${r.result}`:""}
-      </p>`;
+      <p>
+        <strong>${name}</strong><br>
+        Kurz: ${r.odds}<br>
+        ${isAdmin ? `🎲 Výsledek: <strong>${r.result}</strong>` : ""}
+      </p>
+    `;
+
     if(!isAdmin){
       html += `
-      <select id="guess-${name}">
-        ${[1,2,3,4,5,6].map(n=>`<option>${n}</option>`).join("")}
-      </select>
-      <input id="bet-${name}" type="number" placeholder="Sázka">
-      <button onclick="placeBet('${name}')">Vsadit</button>`;
+        <select id="guess-${name}">
+          ${[1,2,3,4,5,6].map(n=>`<option value="${n}">${n}</option>`).join("")}
+        </select>
+        <input id="bet-${name}" type="number" min="1" placeholder="Výše sázky">
+        <button onclick="placeBet('${name}')">Vsadit</button>
+      `;
     }
+
     html += `<hr>`;
   }
 
-  gameArea.innerHTML = html;
+  document.getElementById("gameArea").innerHTML = html;
 }
 
 function createBet(){
-  const name = betName.value.trim();
-  const odds = parseFloat(betOdds.value);
-  if(!name || odds<1) return alert("Neplatná data");
-  db.games.sazky.rounds[name]={
+  const name = document.getElementById("betName").value.trim();
+  const odds = parseFloat(document.getElementById("betOdds").value);
+  if(!name || odds < 1) return alert("Neplatná data");
+
+  db.games.sazky.rounds[name] = {
     odds,
-    result: Math.floor(Math.random()*6)+1,
+    result: Math.floor(Math.random()*6) + 1,
     bets:[]
   };
-  saveDB(); renderSazky();
+
+  saveDB();
+  renderSazky();
 }
 
 function placeBet(name){
-  const g = parseInt(document.getElementById(`guess-${name}`).value);
-  const a = parseInt(document.getElementById(`bet-${name}`).value);
-  if(a<=0) return alert("Neplatná sázka");
+  const guess = parseInt(document.getElementById(`guess-${name}`).value);
+  const amount = parseInt(document.getElementById(`bet-${name}`).value);
+
+  if(!amount || amount <= 0) return alert("Zadej platnou sázku");
+
   db.games.sazky.rounds[name].bets.push({
-    player:nickname,
-    guess:g,
-    amount:a
+    player: nickname,
+    guess,
+    amount,
+    time: Date.now()
   });
-  saveDB(); alert("Vsazeno");
+
+  saveDB();
+  alert("Sázka přijata");
 }
 
-/* ===== PLACEHOLDERS ===== */
-function renderPlaceholder(name){
-  const titles={
+/* ================= PLACEHOLDERS ================= */
+function renderPlaceholder(game){
+  const titles = {
     jednicky_petky:"Jedničky a pětky",
     maroko:"Maroko",
     oko:"Oko (21)",
     general:"Generál",
     ruleta:"Ruleta"
   };
-  gameArea.innerHTML=`
-    <h2>${titles[name]}</h2>
-    <p><em>Hra připravena – logika bude doplněna.</em></p>`;
+
+  document.getElementById("gameArea").innerHTML = `
+    <h2>${titles[game]}</h2>
+    <p><em>Hra je připravena – logika bude doplněna.</em></p>
+  `;
 }
 </script>
 </body>
